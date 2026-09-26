@@ -1,0 +1,14 @@
+role: system
+Be concise.
+---
+role: user
+Hello
+---
+role: assistant
+Hi there!
+---
+role: user
+Goodbye
+---
+role: assistant
+Goodbye!
