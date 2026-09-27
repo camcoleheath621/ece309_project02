@@ -196,7 +196,6 @@ int main() {
 
         // Message 10 at index [9]
         growth.append(Message(Role::Assistant, "Of course, have a good day!")); // capacity stays 16
-        const Message* growth10_ptr = growth.begin();               // save new memory location
         assert(growth.begin() == growth09_ptr);                     // verify no reallocation
 
         // verify all messages were stored
