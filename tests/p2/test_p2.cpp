@@ -15,8 +15,9 @@
 #include "model/scripted_client.h"
 
 #include <cassert>
-#include <string>   // need to change this or remove this
-#include <utility>  // need to change this or remove this
+#include <string>   
+#include <utility>  // used for std::move
+#include <fstream>  // used for Test 12 transcript file
 
 int main() {
     
@@ -34,7 +35,7 @@ int main() {
         const Message& invalid = empty.at(0);   // create variable for message at index 0
 
         assert(invalid.role() == Role::System); // verify system role
-        assert(empty.size() == 0);              // verify empty size
+        assert(empty.size() == 0);              // verify empty conversation has no messages
 
     }
 
@@ -51,10 +52,11 @@ int main() {
         ordering.append(Message(Role::Assistant, "Hi!"));
         ordering.append(Message(Role::User, "How are you doing?"));
         ordering.append(Message(Role::Assistant, "Well, how are you doing?"));
-
-        assert(ordering.at(0).role() == Role::System);      // verify system role
         
-        // verify all messages have correct roles that are in correct indices
+        // verify all messages were stored
+        assert(ordering.size() == 5); 
+
+        // verify all messages have correct roles and indices
         assert(ordering.at(0).role() == Role::System);
         assert(ordering.at(0).content() == "Be concise");
 
@@ -69,7 +71,7 @@ int main() {
 
         assert(ordering.at(4).role() == Role::Assistant);
         assert(ordering.at(4).content() == "Well, how are you doing?");
-        
+    
     }
 
     // Test 3: Rule of Five: Copy Constructor **PASSED**
@@ -87,9 +89,9 @@ int main() {
 
         Conversation copy2(copy);   // use copy constructor 
 
-        assert(copy.size() == copy2.size());    // verify both conversation are the same size
+        assert(copy.size() == copy2.size());    // verify both conversations are the same size
         
-        // verify deep copy by going through every message in both conversation
+        // verify deep copy by going through every message in both conversations
         for (std::size_t i = 0; i < copy.size(); i++) {             
             assert(copy.at(i).role() == copy2.at(i).role());        // verify roles
             assert(copy.at(i).content() == copy2.at(i).content());  // verify messages
@@ -104,32 +106,38 @@ int main() {
     // verify the move constructor steals the original memory location
     // and leaves the original conversation empty
     {
-        Conversation move;
+        Conversation move;      // create conversation
 
+        // create mock conversation
         move.append(Message(Role::User,"Hello"));
         move.append(Message(Role::Assistant,"Hi!"));
         move.append(Message(Role::User,"Does my harness obey the Rule of Five"));
         move.append(Message(Role::Assistant,"I hope so!"));
 
-        const Message* move_og_ptr = move.begin();
+        // save original memory location before moving
+        const Message* move_og_ptr = move.begin(); 
 
-        Conversation expected(move);
+        // make copy of original for comparison
+        Conversation expected(move); 
 
-        Conversation move2(std::move(move));
+        // use move constructor to transfer ownership
+        Conversation move2(std::move(move));    // used #include<utility>
 
+        // verify size of moved conversation
         assert(expected.size() == move2.size());
         
+        // verify that every message and role matches original conversation
         for (std::size_t i = 0; i < expected.size(); i++) {
             assert(expected.at(i).role() == move2.at(i).role());
             assert(expected.at(i).content() == move2.at(i).content());   
         }
 
-        assert(move_og_ptr == move2.begin());
+        // verify move2 stole original memory location
+        assert(move_og_ptr == move2.begin()); 
 
+        // verify original conversation is now empty
         assert(move.size()==0);
         assert(move.begin() == move.end());
-
-
     }
 
     // Test 5: Growth Behavior **PASSED**
@@ -137,50 +145,61 @@ int main() {
     // verify the memory grows by doubling when full
     // while still preserving all stored messages
     {
-        Conversation growth;
+        Conversation growth; // create conversation
 
-        const Message* growth00_ptr = growth.begin();
+        const Message* growth00_ptr = growth.begin(); // save original memory location
 
-        growth.append(Message(Role::User, "Hello")); // capacity goes from 0 to 1
-        const Message* growth01_ptr = growth.begin();
-        assert(growth.begin() != growth00_ptr);
+        // Message 1 at index [0]
+        growth.append(Message(Role::User, "Hello"));    // capacity goes from 0 to 1
+        const Message* growth01_ptr = growth.begin();   // save new memory location
+        assert(growth.begin() != growth00_ptr);         // verify reallocation
 
+        // Message 2 at index [1]
         growth.append(Message(Role::Assistant, "Hi!")); // capacity goes from 1 to 2
-        const Message* growth02_ptr = growth.begin();
-        assert(growth.begin() != growth01_ptr);
+        const Message* growth02_ptr = growth.begin();   // save new memory location
+        assert(growth.begin() != growth01_ptr);         // verify reallocation
 
+        // Message 3 at index [2]
         growth.append(Message(Role::User, "How are you doing?")); // capacity goes from 2 to 4
-        const Message* growth03_ptr = growth.begin();
-        assert(growth.begin() != growth02_ptr);
+        const Message* growth03_ptr = growth.begin();             // save new memory location
+        assert(growth.begin() != growth02_ptr);                   // verify reallocation
 
+        // Message 4 at index [3]
         growth.append(Message(Role::Assistant, "Well, how are you doing?")); // capacity stays 4
-        const Message* growth04_ptr = growth.begin();
-        assert(growth.begin() == growth03_ptr);
+        const Message* growth04_ptr = growth.begin();                        // save new memory location
+        assert(growth.begin() == growth03_ptr);                              // verify no reallocation
         
+        // Message 5 at index [4]
         growth.append(Message(Role::User, "I'm doing good, what is your growth behavior?")); // capacity goes from 4 to 8
-        const Message* growth05_ptr = growth.begin();
-        assert(growth.begin() != growth04_ptr); 
+        const Message* growth05_ptr = growth.begin();               // save new memory location
+        assert(growth.begin() != growth04_ptr);                     // verify reallocation
 
+        // Message 6 at index [5]
         growth.append(Message(Role::Assistant, "My growth behavior is O(1)")); // capacity stays 8
-        const Message* growth06_ptr = growth.begin();
-        assert(growth.begin() == growth05_ptr);
+        const Message* growth06_ptr = growth.begin();               // save new memory location
+        assert(growth.begin() == growth05_ptr);                     // verify no reallocation
 
+        // Message 7 at index [6]
         growth.append(Message(Role::User, "Why is append amortized O(1)?")); // capacity stays 8
-        const Message* growth07_ptr = growth.begin();
-        assert(growth.begin() == growth06_ptr);
+        const Message* growth07_ptr = growth.begin();               // save new memory location
+        assert(growth.begin() == growth06_ptr);                     // verify no reallocation
 
+        //Message 8 at index [7]
         growth.append(Message(Role::Assistant, "Because the array doubles its capacity when full, so reallocations happen less often.")); // capacity stays 8
-        const Message* growth08_ptr = growth.begin();
-        assert(growth.begin() == growth07_ptr);
-
+        const Message* growth08_ptr = growth.begin();               // save new memory location
+        assert(growth.begin() == growth07_ptr);                     // verify no reallocation
+        
+        // Message 9 at index [8]
         growth.append(Message(Role::User, "Thank you!")); // capacity goes from 8 to 16
-        const Message* growth09_ptr = growth.begin();
-        assert(growth.begin() != growth08_ptr);
+        const Message* growth09_ptr = growth.begin();               // save new memory location
+        assert(growth.begin() != growth08_ptr);                     // verify reallocation
 
+        // Message 10 at index [9]
         growth.append(Message(Role::Assistant, "Of course, have a good day!")); // capacity stays 16
-        const Message* growth10_ptr = growth.begin();
-        assert(growth.begin() == growth09_ptr);
+        const Message* growth10_ptr = growth.begin();               // save new memory location
+        assert(growth.begin() == growth09_ptr);                     // verify no reallocation
 
+        // verify all messages were stored
         assert(growth.size()== 10);
 
         Role expected_roles[10] = 
@@ -211,9 +230,10 @@ int main() {
         "Of course, have a good day!"                       // index[9], line 10
         };
 
+        // go through all messages to see if they were preserved during reallocation
         for (std::size_t i = 0; i < growth.size(); i++) {
-            assert(growth.at(i).role() == expected_roles[i]);
-            assert(growth.at(i).content() == expected_content[i]);
+            assert(growth.at(i).role() == expected_roles[i]);       // verify roles
+            assert(growth.at(i).content() == expected_content[i]);  // verify messages
         }
     }
 
@@ -224,33 +244,38 @@ int main() {
     {
         SentinelScanner scanner("<|end_conversation|>"); // create scanner with stop sentinel
 
-        SentinelScanner::Out result = scanner.feed("Hello there");      // feed sentinel normal text w/ no sentinel
+        SentinelScanner::Out result = scanner.feed("Hello there");      // feed scanner normal text with no sentinel
         assert(result.sentinel_found == false);                         // verify no sentinel was falsely detected
 
         SentinelScanner::Out flushed = scanner.flush();                 // release any text held in pending_
 
-        assert(result.safe_text + flushed.safe_text == "Hello there");  // verify that all orginal text has returned
+        assert(result.safe_text + flushed.safe_text == "Hello there");  // verify that all original text has returned
     }
 
     // Test 7: Sentinel Scanner: Split Sentinel **PASSED**
     //
     // verify that our sentinelscanner correctly flags a sentinel 
-    // when feed multiple partial pieces
+    // when feed multiple partial pieces across every boundary
     {
-        SentinelScanner split("<|end_conversation|>"); // create split with stop sentinel
+        std::string sentinel = "<|end_conversation|>";      // define stop sentinel
+        std::string text = "Goodbye" + sentinel;            // combine safe text with sentinel
 
-        SentinelScanner::Out result_split01 = split.feed("Goodbye <|end");      // feed split normal text + partial sentinel
-        SentinelScanner::Out result_split02 = split.feed("_conversation|>");    // feed split remaining sentinel
+        // test all possible locations where the input could be split
+        for(std::size_t i = 0; i <= text.size(); i++) {
+            SentinelScanner split(sentinel); // create a new scanner for each split
 
-        assert((result_split01.sentinel_found || result_split02.sentinel_found) == true);   // verify sentinel was found
-        assert((result_split01.safe_text + result_split02.safe_text) == "Goodbye ");        // verify proper safe text
+            SentinelScanner::Out result_split01 = split.feed(text.substr(0,i));   // feed first part
+            SentinelScanner::Out result_split02 = split.feed(text.substr(i));    // feed remaining part
 
+            assert((result_split01.sentinel_found || result_split02.sentinel_found) == true);   // verify sentinel was found
+            assert((result_split01.safe_text + result_split02.safe_text) == "Goodbye");        // verify only safe text was returned
+        }
     }
 
     // Test 8: Sentinel Scanner: False Alarms **PASSED**
     //
-    // verify that our sentinelscanner does not mistake a sentinel
-    // with a false sentinel
+    // verify that the sentinelscanner does not mistake
+    // similar text for the actual sentinel
     {
         SentinelScanner false_alarm("<|end_conversation|>"); // create false_alarm with stop sentinel
 
@@ -268,7 +293,7 @@ int main() {
     // Test 9: Sentinel Scanner: Bounded Memory **PASSED**
     //
     // verify that pending_ never exceeds sentinel.size() - 1
-    // when feed a large adversarial stream
+    // when feeding a large adversarial stream
     {
         std::string sentinel_bm = "<|end_conversation|>";   // stop sentinel used for bounded_memory
         SentinelScanner bounded_memory(sentinel_bm);        // create bounded_memory
@@ -359,7 +384,8 @@ int main() {
         // copy the script's system message into the harness config
         cfg.system_message = model_tl->system_message();
 
-        Harness harness_tl(std::move(model_tl), cfg); // transfer ownership
+        // transfer ownership
+        Harness harness_tl(std::move(model_tl), cfg); // uses <utility>
 
         TestInput input_tl;     // create our own fake input
         TestOutput output_tl;   // create our own fake output
@@ -375,7 +401,7 @@ int main() {
     // Test 11: Harness: Sentinel Halt **PASSED**
     //
     // verify that the harness stops with the sentinel
-    // when the model prodcues the stop sentinel
+    // when the model produces the stop sentinel
     {
         // Fake User Input
         class TestInput : public InputSource {   
@@ -392,9 +418,9 @@ int main() {
                     return "How are you";   // fake input "How are you"
                 }
 
-                if (count_ == 2) {          // second line
+                if (count_ == 2) {          // third line
                     count_++;               // move to next fake input
-                    return "Goodbye";       // fake input stop sentinel
+                    return "Goodbye";       // fake input "Goodbye"
                 }
 
                 eof_ = true;                // end of fake input
@@ -431,7 +457,8 @@ int main() {
         // copy the script's system message into the harness config
         cfg.system_message = model_t2->system_message();
 
-        Harness harness_t2(std::move(model_t2), cfg); // transfer ownership
+        // transfer ownership
+        Harness harness_t2(std::move(model_t2), cfg); // uses <utility>
 
         TestInput input_t2;     // create our own fake input
         TestOutput output_t2;   // create our own fake output
@@ -445,21 +472,79 @@ int main() {
 
     // Test 12: Transcript Round Trip **PASSED**
     //
-    // verify ReplayModelClient loads the saved transcript
-    // and reproduces the same assistant responses
-    {   
-        ReplayModelClient replay("tests/p2/test_transcript.txt"); // load saved test_transcript
+    // verify ReplayModelClient reproduces the same messages 
+    // in a mock conversation using the transcript format     
+    {
+        Conversation mock;   // create conversation
 
-        Conversation replay_conversation;           // create a conversation for replays
+        // create mock conversation messages
+        mock.append(Message(Role::System, "Be concise."));
+        mock.append(Message(Role::User, "Hello"));
+        mock.append(Message(Role::Assistant, "Hi there!"));
+        mock.append(Message(Role::User, "Goodbye"));
+        mock.append(Message(Role::Assistant, "Goodbye!"));
 
-        Message replay_01 = replay.generate(replay_conversation); // replay first assistance response
-        Message replay_02 = replay.generate(replay_conversation); // replay second assistance response
+        // open transcript file for saving
+        std::ofstream file("tests/p2/test_transcript.txt"); // used #include <fstream>
 
-        assert(replay_01.role() == Role::Assistant); // verify first response is assistance's message
-        assert(replay_02.role() == Role::Assistant); // verify second response is assistance's message
+        // verify the file opened correctly
+        assert(file.is_open());   
 
-        assert(replay_01.content() == "Hi there!");  // verify first response exactly matches transcript
-        assert(replay_02.content() == "Goodbye!");   // verify second response exactly matches transcript
+        bool first = true;  // format helper
+
+        // save every message using the same format that's in main.cpp
+        for (const Message* m = mock.begin(); m != mock.end(); ++m) {
+
+            // if this is not the first message use seperate message blocks
+            if (!first) {
+                file << "---\n";   
+            }
+
+            // after the first message beings, no other message can be first
+            else {
+                first = false;
+            }
+            
+            // save the correct role name
+            if (m->role() == Role::System) {
+                file << "role: system\n";
+            }
+            
+            else if (m->role() == Role::User) {
+                file << "role: user\n";
+            }
+            
+            else {
+                file << "role: assistant\n";
+            }
+
+            // save file content
+            file << m->content() << "\n";   
+        }
+
+        // finish saving before replaying the conversation
+        file.close();   
+
+        // load the transcript we just saved
+        ReplayModelClient replay("tests/p2/test_transcript.txt");
+
+        // create the replay conversation
+        Conversation replay_conversation;   
+
+        // replay the two assistant messages
+        Message replay_01 = replay.generate(replay_conversation);
+        Message replay_02 = replay.generate(replay_conversation);
+
+        // verify saved system message was loaded correctly
+        assert(replay.system_message() == mock.at(0).content());
+
+        // verify replayed roles
+        assert(replay_01.role() == Role::Assistant);
+        assert(replay_02.role() == Role::Assistant);
+
+        // verify replayed messages match the original messages
+        assert(replay_01.content() == mock.at(2).content());
+        assert(replay_02.content() == mock.at(4).content());
     }
 
     return 0;
