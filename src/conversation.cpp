@@ -1,5 +1,4 @@
 #include "core/conversation.h"
-#include <stdexcept>
 
 // default constructor (empty brackets)
 Conversation::Conversation() {
@@ -125,11 +124,13 @@ Conversation::Conversation(const Conversation& other) {
  // return the message at the specified index
  const Message& Conversation::at(std::size_t i) const {
     
-    if ( i >= size_) {                                                  // if index is invalid
-        throw std:: out_of_range("Conversation index out of range");    // throw an out-of-range expection
+    static const Message invalid_message;       // safe default in case of an invalid indedx
+    
+    if ( i >= size_) {             // if index is invalid
+        return invalid_message;    // return blank message
     }
     
-    return data_[i];
+    return data_[i]; // return the valid index
  }
 
  // return a pointer to the first message
