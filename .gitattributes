@@ -1,0 +1,2 @@
+scripts/*.script text eol=lf
+tests/p2/test_transcript.txt text eol=lf
