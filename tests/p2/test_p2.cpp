@@ -545,6 +545,68 @@ int main() {
         assert(replay_01.content() == mock.at(2).content());
         assert(replay_02.content() == mock.at(4).content());
     }
+    
+    // Test 13: Harness: EOF / User Exit **PASSED**
+    // EXTRA: Testing EOF
+    //
+    // verify that the harness stops with UserExit
+    // when the input source reaches EOF
+{
+    // Fake User Input
+        class TestInput : public InputSource {
+        public:
+            std::string read_line() override {
+                if (count_ == 0) {          // first line
+                    count_++;               // move to next fake input
+                    return "Hello";         // fake input "Hello"
+                }
+
+                eof_ = true;                // end of fake input
+                return "";
+            }
+
+            bool is_eof() const override {  // see if there is any input left
+                return eof_;
+            }
+
+        private:
+            int count_ = 0;                 // initialize count_ at 0
+            bool eof_ = false;              // initialize end of file as false
+        };
+
+        // Fake Output Terminal
+        class TestOutput : public OutputSink {
+        public:
+            void write(std::string_view text) override {    // calls harness to print something
+                output_ += text;                            // save the printed text
+            }
+
+        private:
+            std::string output_;                            // store everything harness prints
+        };
+
+        // allow a higher turn limit so EOF happens first
+        HarnessConfig cfg;
+        cfg.max_turns = 10;
+
+        // create fake model using the greeting script
+        auto model_eof = std::make_unique<ScriptedModelClient>("scripts/greeting.script");
+
+        // copy the script's system message into the harness config
+        cfg.system_message = model_eof->system_message();
+
+        // transfer ownership
+        Harness harness_eof(std::move(model_eof), cfg); // uses <utility>
+
+        TestInput input_eof;     // create our own fake input
+        TestOutput output_eof;   // create our own fake output
+
+        // run the conversation and save why it stopped
+        StopReason result_eof = harness_eof.run(input_eof, output_eof);
+
+        // verify it stopped because the input reached EOF
+        assert(result_eof.kind == StopReason::Kind::UserExit);
+    }
 
     return 0;
 }
