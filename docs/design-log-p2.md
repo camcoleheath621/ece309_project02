@@ -3,15 +3,18 @@
 (500–800 words total. See spec §5 for what each section must cover.)
 
 ## Growth factor and amortized cost
-
+I chose a growth factor of 2, meaning every time the array becomes full, its capacity doubles. I started with a capacity of 1 and then increased the size of the array to 2, 4, 8, 16, and so on as more storage was needed. I chose doubling because it reduces how often the backing array must be reallocated and the existing Message objects copied into a new backing array. The downside to this approach is that it can allocate more memory than is immediately needed. For example, if the capacity for an array is 64 and a 65th message is added, the capacity becomes 128 even though only 65 positions are being used. Despite this, I still chose doubling because it makes reallocations happen less frequently as the conversation grows.
+Most appends just put a single message into the next available spot in the conversation. Occasionally, when the array is full, my growth factor requires copying all of the existing Message objects from the old backing array into the newly allocated backing array. These resizes become less frequent as the array gets larger, so over many appends, the total amount of copying is proportional to n. Because of this, the average cost of each append stays constant, giving append() an amortized time complexity of O(1).
 
 
 ## Rule of Five evidence
-
+Since Conversation owns a dynamically allocated array of Message objects, I used the Rule of Five to ensure that memory is handled correctly. The destructor uses delete[] to free the array when a Conversation is destroyed so no memory is leaked. The copy constructor creates a new array and copies the messages into it. Both the original and copied conversations have their own separate arrays in memory. The copy assignment operator also handles self-assignment and replaces the current storage with its own copy of the other conversation.
+The move operations transfer ownership instead of copying every message. The move constructor takes the other conversation’s data_ pointer, size, and capacity, then sets the source pointer to nullptr and its size and capacity to zero. The move assignment operator first deletes any memory already owned by the current conversation. Then it takes ownership of the source’s data and clears the source in the same way. This leaves the move-from object valid and empty. My tests check that copied conversations use different memory addresses, while moved conversations keep the original pointer, showing that copying creates separate storage and moving transfers ownership.
 
 
 ## Sentinel scanner: bounded pending_ proof
-
+The SentinelScanner only keeps the maximum number of characters that could still be part of the sentinel. I limit pending_ to sentinel_.size() - 1 because if it ever contained sentinel_.size() matching characters, then the sentinel would already have been found. Keeping one less than the size of the sentinel allows the scanner to preserve a possible partial match across chunks without holding any unnecessary text. It also gives a clear bound for knowing that any older characters can safely be released as safe_text.
 
 
 ## What I would change differently
+One change I would make differently is my logic for the copy assignment operator. My current implementation deletes the storage for the old array first, which works during normal execution. However, in the event that an allocation fails, the original data would be lost. Creating a replacement first would be a more robust and safer way to implement the copy assignment operator.
